@@ -1,31 +1,33 @@
-# Storewright Frontend
+# Storewright
 
-Human-crafted, anti-AI marketing site for AI-powered Shopify store builder.
+Storewright is an AI e-commerce command center for merchants in the US, UK, Canada, and Europe. It helps merchants discover products, generate store blueprints, connect Shopify and Meta accounts, and launch store assets and ad campaigns.
 
-## Stack
-- React 18 + TypeScript
-- Vite
-- Tailwind CSS (custom human-crafted palette)
-- Framer Motion
-- React Query
+## What works today
+- Authenticated onboarding with Supabase Auth
+- Automatic organization creation for each authenticated user
+- Free credits activation
+- Product research using AI
+- Store blueprint generation
+- Shopify and Meta connection flows using token-based setup
+- Live Shopify build endpoint for pages, products, collections, and media
+- Dashboard with a single next action and guided workflow
 
-## Development
+## What is required for live store creation
+To build a live Shopify store, the merchant must connect:
+- Shopify store URL
+- Shopify Admin API access token
 
-```bash
-bun install
-bun run dev
-```
+To launch ads, the merchant must connect:
+- Meta access token
+- Ad account ID
 
-## Environment
+## Environment variables
+- `VITE_API_URL`
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
 
-Copy `.env.example` to `.env` and set:
-- `VITE_API_URL` — Backend API URL (default: https://shopifywithai.onrender.com)
-
-## Design Philosophy
-
-This project intentionally avoids AI-generated aesthetics:
-- Serif fonts for headlines (crafted feel)
-- Warm color palette (not AI beige)
-- Specific metrics and testimonials (not vague claims)
-- Real founder story (human touch)
-- Intentional imperfections where appropriate
+## Design philosophy
+- Warm, human, anti-AI aesthetic
+- Clear conversion-driven UI
+- No org ID prompts
+- No fake demo-only affordances in the core user flow
