@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { ArrowRight } from 'lucide-react';
 
 const API_BASE = 'https://shopifywithai.onrender.com';
 
@@ -32,25 +33,23 @@ export default function Dashboard() {
   const [supplierResult, setSupplierResult] = useState<AgentResult | null>(null);
   const [analyticsResult, setAnalyticsResult] = useState<AgentResult | null>(null);
   const [activeTab, setActiveTab] = useState<'research' | 'store' | 'copy' | 'ads' | 'suppliers' | 'analytics'>('research');
-  const [error, setError] = useState<string>('');
+  const [showOnboardingPrompt, setShowOnboardingPrompt] = useState(false);
 
   useEffect(() => {
-    // Get org ID from URL or localStorage
-    const params = new URLSearchParams(window.location.search);
-    const urlOrgId = params.get('org_id');
+    // Get org ID from localStorage (set during onboarding)
     const savedOrgId = localStorage.getItem('storewright_org_id');
     
-    if (urlOrgId) {
-      setOrgId(urlOrgId);
-      localStorage.setItem('storewright_org_id', urlOrgId);
-    } else if (savedOrgId) {
+    if (savedOrgId) {
       setOrgId(savedOrgId);
+    } else {
+      // No org ID - user needs to complete onboarding
+      setShowOnboardingPrompt(true);
     }
   }, []);
 
   const runAgent = async (endpoint: string, body: any, setter: (r: any) => void) => {
     if (!orgId) {
-      setError('We still need your organization ID. Head to the onboarding flow to create an account and land on the dashboard automatically.');
+      setShowOnboardingPrompt(true);
       return;
     }
     
@@ -135,13 +134,18 @@ export default function Dashboard() {
           <p className="text-slate-400">Run AI agents to build your dropshipping business</p>
         </div>
 
-        {!orgId && (
-          <div className="bg-slate-800 p-4 rounded-lg mb-6">
-            <p className="text-slate-300">
-              To run any AI agent, complete the onboarding flow. Your organization ID is created automatically and saved for you.
+        {/* Onboarding Prompt - Only shows if no org ID */}
+        {showOnboardingPrompt && (
+          <div className="bg-amber-900/50 border border-amber-500 p-6 rounded-lg mb-6">
+            <h3 className="text-lg font-bold text-amber-400 mb-2">Welcome to Storewright!</h3>
+            <p className="text-slate-300 mb-4">
+              Create your free account to start using AI agents. No credit card required — you get free AI credits instantly.
             </p>
-            <a href="/onboarding" className="text-forest-400 text-sm mt-2 inline-flex items-center gap-1">
-              Continue onboarding <ArrowRight className="w-3 h-3" />
+            <a 
+              href="/onboarding" 
+              className="inline-flex items-center gap-2 bg-forest-600 px-6 py-3 rounded-lg hover:bg-forest-700 transition"
+            >
+              Create Free Account <ArrowRight className="w-4 h-4" />
             </a>
           </div>
         )}
@@ -149,12 +153,12 @@ export default function Dashboard() {
         {/* Agent Tabs */}
         <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
           {[
-            { id: 'research', label: '🔍 Product Research', icon: '🔍' },
-            { id: 'store', label: '🏗️ Store Builder', icon: '🏗️' },
-            { id: 'copy', label: '✍️ Copywriter', icon: '✍️' },
-            { id: 'ads', label: '📢 Ad Creator', icon: '📢' },
-            { id: 'suppliers', label: '🏭 Suppliers', icon: '🏭' },
-            { id: 'analytics', label: '📊 Analytics', icon: '📊' },
+            { id: 'research', label: '🔍 Product Research' },
+            { id: 'store', label: '🏗️ Store Builder' },
+            { id: 'copy', label: '✍️ Copywriter' },
+            { id: 'ads', label: '📢 Ad Creator' },
+            { id: 'suppliers', label: '🏭 Suppliers' },
+            { id: 'analytics', label: '📊 Analytics' },
           ].map(tab => (
             <button
               key={tab.id}
@@ -180,7 +184,7 @@ export default function Dashboard() {
               
               <button
                 onClick={runTrendHunter}
-                disabled={!!loading}
+                disabled={!!loading || !orgId}
                 className="bg-forest-600 px-6 py-3 rounded-lg hover:bg-forest-700 disabled:opacity-50 mb-6"
               >
                 {loading === '/v1/research/trending' ? '🔄 Researching...' : '🔍 Find Trending Products'}
@@ -272,28 +276,8 @@ export default function Dashboard() {
                       <h3 className="font-bold text-lg mb-2">{desc.product_name}</h3>
                       <p className="text-forest-400 font-bold mb-2">{desc.headline}</p>
                       <p className="text-slate-300 mb-4">{desc.long_description}</p>
-                      {desc.micro_copy && (
-                        <div className="text-sm text-slate-400">
-                          <p>Urgency: {desc.micro_copy.urgency_badge}</p>
-                          <p>Guarantee: {desc.micro_copy.guarantee}</p>
-                        </div>
-                      )}
                     </div>
                   ))}
-
-                  {copyResult.email_sequence && (
-                    <div className="bg-slate-700 p-4 rounded-lg">
-                      <h3 className="font-bold mb-2">Email Sequence</h3>
-                      <div className="mb-4">
-                        <p className="font-bold">Welcome Email:</p>
-                        <p className="text-slate-400">{copyResult.email_sequence.welcome_subject}</p>
-                      </div>
-                      <div>
-                        <p className="font-bold">Abandoned Cart:</p>
-                        <p className="text-slate-400">{copyResult.email_sequence.abandoned_cart_subject}</p>
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
@@ -318,27 +302,14 @@ export default function Dashboard() {
                   <h3 className="font-bold text-lg">Facebook Ads</h3>
                   {adResult.facebook_ads?.map((ad: any, i: number) => (
                     <div key={i} className="bg-slate-700 p-4 rounded-lg">
-                      <div className="text-xs text-slate-400 mb-1">{ad.ad_type}</div>
                       <p className="text-lg font-bold mb-2">{ad.primary_text}</p>
                       <p className="text-forest-400 mb-2">{ad.headline}</p>
-                      <p className="text-sm text-slate-300 mb-2">{ad.description}</p>
                       <div className="flex gap-2 flex-wrap">
                         <span className="bg-slate-600 px-2 py-1 rounded text-xs">CTA: {ad.cta}</span>
-                        <span className="bg-slate-600 px-2 py-1 rounded text-xs">Target: {ad.target_interest}</span>
                         <span className="bg-slate-600 px-2 py-1 rounded text-xs">Budget: {ad.budget_suggestion}</span>
                       </div>
                     </div>
                   ))}
-
-                  {adResult.tiktok_concept && (
-                    <div className="bg-slate-700 p-4 rounded-lg">
-                      <h3 className="font-bold mb-2">TikTok Concept</h3>
-                      <p><strong>Hook (first 3s):</strong> {adResult.tiktok_concept.hook_seconds}</p>
-                      <p><strong>Message:</strong> {adResult.tiktok_concept.main_message}</p>
-                      <p><strong>CTA:</strong> {adResult.tiktok_concept.call_to_action}</p>
-                      <p className="mt-2"><strong>Hashtags:</strong> {adResult.tiktok_concept.hashtag_strategy?.join(' ')}</p>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
@@ -363,23 +334,9 @@ export default function Dashboard() {
                   {supplierResult.suppliers?.map((s: any, i: number) => (
                     <div key={i} className="bg-slate-700 p-4 rounded-lg">
                       <h3 className="font-bold text-lg">{s.platform}</h3>
-                      <p className="text-slate-300 mb-2"><strong>Search:</strong> {s.search_terms?.join(', ')}</p>
-                      <p className="text-slate-300 mb-2"><strong>Look for:</strong> {s.what_to_look_for}</p>
-                      <p className="text-slate-300 mb-2"><strong>Red flags:</strong> {s.red_flags?.join(', ')}</p>
                       <p className="text-forest-400"><strong>Est. cost:</strong> {s.estimated_cost}</p>
                     </div>
                   ))}
-
-                  {supplierResult.vetting_checklist && (
-                    <div className="bg-slate-700 p-4 rounded-lg">
-                      <h3 className="font-bold mb-2">Vetting Checklist</h3>
-                      <ul className="list-disc list-inside text-slate-300">
-                        {supplierResult.vetting_checklist.map((item: string, i: number) => (
-                          <li key={i}>{item}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
@@ -389,7 +346,7 @@ export default function Dashboard() {
           {activeTab === 'analytics' && (
             <div>
               <h2 className="text-xl font-bold mb-4">Store Analytics & Optimization</h2>
-              <p className="text-slate-400 mb-4">Get insights and optimization recommendations for your store.</p>
+              <p className="text-slate-400 mb-4">Get insights and optimization recommendations.</p>
               
               <button
                 onClick={runAnalytics}
@@ -400,38 +357,19 @@ export default function Dashboard() {
               </button>
 
               {analyticsResult && (
-                <div className="space-y-4">
-                  {analyticsResult.key_metrics && (
-                    <div className="bg-slate-700 p-4 rounded-lg">
-                      <h3 className="font-bold mb-2">Key Benchmarks</h3>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div><strong>Conv Rate:</strong> {analyticsResult.key_metrics.conversion_rate_benchmark}</div>
-                        <div><strong>AOV Target:</strong> {analyticsResult.key_metrics.avg_order_value_target}</div>
-                        <div><strong>ROAS:</strong> {analyticsResult.key_metrics.roas_target}</div>
-                        <div><strong>Refund Max:</strong> {analyticsResult.key_metrics.refund_rate_threshold}</div>
-                      </div>
-                    </div>
-                  )}
-
-                  {analyticsResult.quick_wins && (
-                    <div className="bg-slate-700 p-4 rounded-lg">
-                      <h3 className="font-bold mb-2">Quick Wins</h3>
-                      {analyticsResult.quick_wins.map((win: any, i: number) => (
-                        <div key={i} className="mb-4 border-b border-slate-600 pb-2">
-                          <p className="font-bold text-forest-400">{win.problem}</p>
-                          <p className="text-slate-300">{win.solution}</p>
-                          <p className="text-sm text-slate-400">Impact: {win.expected_impact}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                <div className="bg-slate-700 p-4 rounded-lg">
+                  <h3 className="font-bold mb-2">Key Benchmarks</h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div><strong>Conv Rate:</strong> {analyticsResult.key_metrics?.conversion_rate_benchmark}</div>
+                    <div><strong>AOV Target:</strong> {analyticsResult.key_metrics?.avg_order_value_target}</div>
+                  </div>
                 </div>
               )}
             </div>
           )}
         </div>
 
-        {/* Quick Actions */}
+        {/* Quick Stats */}
         <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-slate-800 p-4 rounded-lg text-center">
             <div className="text-3xl mb-2">🔍</div>
@@ -441,7 +379,7 @@ export default function Dashboard() {
           <div className="bg-slate-800 p-4 rounded-lg text-center">
             <div className="text-3xl mb-2">🏗️</div>
             <div className="text-2xl font-bold">{storeBlueprint ? 1 : 0}</div>
-            <div className="text-slate-400">Store Blueprints</div>
+            <div className="text-slate-400">Stores Built</div>
           </div>
           <div className="bg-slate-800 p-4 rounded-lg text-center">
             <div className="text-3xl mb-2">✍️</div>

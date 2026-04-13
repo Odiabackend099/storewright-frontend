@@ -36,12 +36,12 @@ export default function Onboarding() {
       if (result.error) {
         setError(result.error)
       } else if (result.data?.organization?.id) {
-        const orgId = result.data.organization.id
-        setOrgId(orgId)
-        localStorage.setItem('storewright_org_id', orgId)
+        const newOrgId = result.data.organization.id
+        setOrgId(newOrgId)
+        localStorage.setItem('storewright_org_id', newOrgId)
         setCredits(FREE_CREDITS[plan as keyof typeof FREE_CREDITS] || 5)
-        // Redirect to dashboard with org link
-        window.location.href = `/dashboard?org_id=${orgId}`
+        // Go to credits step, then dashboard
+        setStep(1)
       }
     } catch (e) {
       setError('Something went wrong. Please try again.')
