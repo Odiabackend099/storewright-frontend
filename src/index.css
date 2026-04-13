@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Anti-AI base styles */
+@layer base {
+  html {
+    @apply antialiased;
+    /* Warm off-white - not clinical */
+    background-color: #fcf9f4;
+  }
+  
+  body {
+    @apply text-ink-900 font-body;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display font-normal;
+  }
+  
+  /* Headlines should feel crafted, not smooth */
+  h1 {
+    @apply text-display-lg md:text-display-xl;
+  }
+  
+  h2 {
+    @apply text-display-md md:text-display-lg;
+  }
+  
+  h3 {
+    @apply text-display-sm md:text-display-md;
+  }
+}
+
+@layer components {
+  /* Primary button - forest green */
+  .btn-primary {
+    @apply px-6 py-3 bg-forest-600 text-white font-medium rounded-soft
+           hover:bg-forest-700 transition-colors duration-200
+           focus:outline-none focus:ring-2 focus:ring-forest-500 focus:ring-offset-2;
+  }
+  
+  /* Secondary button - outlined */
+  .btn-secondary {
+    @apply px-6 py-3 border-2 border-ink-300 text-ink-800 font-medium rounded-soft
+           hover:border-forest-600 hover:text-forest-700 transition-colors duration-200;
+  }
+  
+  /* Cards with soft shadows */
+  .card {
+    @apply bg-white p-6 rounded-softer shadow-soft;
+  }
+  
+  /* Section containers */
+  .section {
+    @apply max-w-6xl mx-auto px-6 py-16 md:py-24;
+  }
+}
+
+/* Anti-AI: Intentional imperfections */
+@layer utilities {
+  /* Subtle texture overlay */
+  .texture-grain {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    opacity: 0.03;
+  }
+}
