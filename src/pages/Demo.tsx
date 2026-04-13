@@ -44,7 +44,7 @@ export default function Demo() {
             onClick={() => setSelectedAgent('product')}
             className={`px-6 py-3 rounded-soft font-medium transition-colors ${
               selectedAgent === 'product' 
-                ? ? 'bg-forest-600 text-white' 
+                ? 'bg-forest-600 text-white' 
                 : 'bg-white text-ink-700 hover:bg-forest-50'
             }`}
           >
