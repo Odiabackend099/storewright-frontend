@@ -16,14 +16,7 @@ function App() {
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/demo" element={<Demo />} />
           <Route path="/onboarding" element={<Onboarding />} />
-          <Route 
-            path="/dashboard" 
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            } 
-          />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         </Routes>
       </div>
     </AuthProvider>
