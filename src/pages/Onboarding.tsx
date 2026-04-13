@@ -33,26 +33,15 @@ export default function Onboarding() {
     
     try {
       const result = await apiClient.createOrg(name || email.split('@')[0], email)
-      
       if (result.error) {
-        // Show specific error messages
-        const err = result.error.toLowerCase()
-        if (err.includes('already exists') || err.includes('duplicate')) {
-          setError('An account with this email already exists. Try signing in instead.')
-        } else if (err.includes('email')) {
-          setError('Please enter a valid email address.')
-        } else {
-          setError(result.error)
-        }
+        setError(result.error)
       } else if (result.data?.organization?.id) {
-        setOrgId(result.data.organization.id)
-        // If returning user, show them their dashboard directly
-        if (result.data.existing) {
-          navigate('/dashboard')
-        } else {
-          setCredits(FREE_CREDITS[plan as keyof typeof FREE_CREDITS] || 5)
-          setStep(1)
-        }
+        const orgId = result.data.organization.id
+        setOrgId(orgId)
+        localStorage.setItem('storewright_org_id', orgId)
+        setCredits(FREE_CREDITS[plan as keyof typeof FREE_CREDITS] || 5)
+        // Redirect to dashboard with org link
+        window.location.href = `/dashboard?org_id=${orgId}`
       }
     } catch (e) {
       setError('Something went wrong. Please try again.')

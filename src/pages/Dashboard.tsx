@@ -32,6 +32,7 @@ export default function Dashboard() {
   const [supplierResult, setSupplierResult] = useState<AgentResult | null>(null);
   const [analyticsResult, setAnalyticsResult] = useState<AgentResult | null>(null);
   const [activeTab, setActiveTab] = useState<'research' | 'store' | 'copy' | 'ads' | 'suppliers' | 'analytics'>('research');
+  const [error, setError] = useState<string>('');
 
   useEffect(() => {
     // Get org ID from URL or localStorage
@@ -49,7 +50,7 @@ export default function Dashboard() {
 
   const runAgent = async (endpoint: string, body: any, setter: (r: any) => void) => {
     if (!orgId) {
-      alert('Please enter your organization ID first');
+      setError('We still need your organization ID. Head to the onboarding flow to create an account and land on the dashboard automatically.');
       return;
     }
     
@@ -134,24 +135,14 @@ export default function Dashboard() {
           <p className="text-slate-400">Run AI agents to build your dropshipping business</p>
         </div>
 
-        {/* Org ID Input */}
         {!orgId && (
           <div className="bg-slate-800 p-4 rounded-lg mb-6">
-            <label className="block text-sm mb-2">Enter your Organization ID:</label>
-            <div className="flex gap-2">
-              <input 
-                type="text" 
-                className="flex-1 bg-slate-700 border border-slate-600 rounded px-4 py-2"
-                placeholder="org_..."
-                onChange={(e) => setOrgId(e.target.value)}
-              />
-              <button 
-                onClick={() => localStorage.setItem('storewright_org_id', orgId)}
-                className="bg-forest-600 px-4 py-2 rounded hover:bg-forest-700"
-              >
-                Save
-              </button>
-            </div>
+            <p className="text-slate-300">
+              To run any AI agent, complete the onboarding flow. Your organization ID is created automatically and saved for you.
+            </p>
+            <a href="/onboarding" className="text-forest-400 text-sm mt-2 inline-flex items-center gap-1">
+              Continue onboarding <ArrowRight className="w-3 h-3" />
+            </a>
           </div>
         )}
 
