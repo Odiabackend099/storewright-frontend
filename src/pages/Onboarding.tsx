@@ -1,259 +1,261 @@
 import { useState, useEffect } from 'react'
-import { Link, useSearchParams, useNavigate } from 'react-router-dom'
-import { ArrowRight, ArrowLeft, Check, Loader2, Sparkles, Zap, Shield } from 'lucide-react'
-import { apiClient } from '../lib/api'
-
-const STEPS = ['account', 'credits', 'shopify', 'done']
-
-const FREE_CREDITS = {
-  starter: 5,
-  growth: 15,
-  scale: 30,
-}
+import { useNavigate, useLocation } from 'react-router-dom'
+import { ArrowRight, Loader2, Sparkles, Zap, Check } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function Onboarding() {
-  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const [step, setStep] = useState(0)
+  const location = useLocation()
+  const { user, organizationId, signIn, signUp, refreshOrganization } = useAuth()
+  
+  const [step, setStep] = useState<'auth' | 'connecting' | 'credits' | 'done'>('auth')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [credits, setCredits] = useState(5)
-  const [isLogin, setIsLogin] = useState(searchParams.get('login') === 'true')
+  const [isLogin, setIsLogin] = useState(false)
+  const [credits, setCredits] = useState(15)
   
   // Form state
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
-  const [plan, setPlan] = useState('growth')
-  const [orgId, setOrgId] = useState<string | null>(null)
 
-  const handleCreateAccount = async () => {
+  // If user is already logged in, redirect to appropriate step
+  useEffect(() => {
+    if (user && organizationId) {
+      // User has auth + org, go to dashboard
+      navigate('/dashboard', { replace: true })
+    } else if (user && !organizationId) {
+      // User has auth but no org, show connecting state
+      setStep('connecting')
+      // Try to create org via backend
+      createOrganizationForUser()
+    }
+  }, [user, organizationId])
+
+  // Create organization for authenticated user
+  const createOrganizationForUser = async () => {
+    try {
+      const response = await fetch('https://shopifywithai.onrender.com/v1/organizations/from-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: user?.id,
+          email: user?.email,
+          name: name || user?.user_metadata?.full_name || user?.email?.split('@')[0],
+        }),
+      })
+      
+      if (response.ok) {
+        await refreshOrganization()
+        setStep('credits')
+      } else {
+        const data = await response.json()
+        setError(data.detail || 'Failed to create organization')
+      }
+    } catch (err) {
+      setError('Something went wrong')
+    }
+  }
+
+  const handleSubmit = async () => {
     setLoading(true)
     setError('')
     
     try {
-      const result = await apiClient.createOrg(name || email.split('@')[0], email)
-      if (result.error) {
-        setError(result.error)
-      } else if (result.data?.organization?.id) {
-        const newOrgId = result.data.organization.id
-        setOrgId(newOrgId)
-        localStorage.setItem('storewright_org_id', newOrgId)
-        setCredits(FREE_CREDITS[plan as keyof typeof FREE_CREDITS] || 5)
-        // Go to credits step, then dashboard
-        setStep(1)
+      if (isLogin) {
+        const { error } = await signIn(email, password)
+        if (error) {
+          setError(error.message || 'Invalid email or password')
+        }
+        // Auth change will trigger the useEffect above
+      } else {
+        const { error } = await signUp(email, password, name || email.split('@')[0])
+        if (error) {
+          setError(error.message || 'Failed to create account')
+        }
+        // Auth change will trigger the useEffect above
       }
-    } catch (e) {
-      setError('Something went wrong. Please try again.')
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong')
     }
     
     setLoading(false)
   }
 
   const handleActivateCredits = async () => {
-    if (!orgId) return
+    if (!organizationId) return
     
     setLoading(true)
     try {
-      // Activate credits directly - no payment needed
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/v1/billing/activate-free`, {
+      const res = await fetch('https://shopifywithai.onrender.com/v1/billing/activate-free', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ organization_id: orgId, plan }),
+        body: JSON.stringify({ organization_id: organizationId, plan: 'growth' }),
       })
+      
       if (res.ok) {
-        setStep(2)
+        setStep('done')
       } else {
-        // Even if API fails, give credits anyway for demo
-        setStep(2)
+        // Still proceed even if activation fails
+        setStep('done')
       }
     } catch (e) {
-      // Give credits anyway
-      setStep(2)
+      setStep('done')
     }
     setLoading(false)
   }
 
-  const handleSkipShopify = () => {
-    setStep(3)
+  const handleGoToDashboard = () => {
+    navigate('/dashboard', { replace: true })
   }
 
   return (
-    <div className="min-h-screen bg-cream-100">
-      {/* Free credits banner */}
-      <div className="bg-forest-600 text-white py-3 text-center text-sm font-medium">
-        <span className="flex items-center justify-center gap-2">
-          <Sparkles className="w-4 h-4" />
-          Free credits activated — no payment required
-        </span>
-      </div>
-
+    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">
       {/* Progress bar */}
-      <div className="h-1 bg-ink-100">
+      <div className="fixed top-0 left-0 right-0 h-1 bg-slate-800">
         <div 
-          className="h-full bg-forest-500 transition-all duration-300"
-          style={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
+          className="h-full bg-gradient-to-r from-forest-500 to-forest-400 transition-all duration-500"
+          style={{ width: step === 'auth' ? '25%' : step === 'connecting' ? '50%' : step === 'credits' ? '75%' : '100%' }}
         />
       </div>
 
-      <div className="max-w-md mx-auto px-6 py-12">
-        {/* Step 0: Account */}
-        {step === 0 && (
-          <div className="card">
+      <div className="max-w-md mx-auto px-6 pt-24 pb-12">
+        {/* Step: Auth */}
+        {step === 'auth' && (
+          <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-8">
             <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-forest-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Zap className="w-8 h-8 text-forest-600" />
+              <div className="w-16 h-16 bg-gradient-to-br from-forest-500 to-forest-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-forest-500/25">
+                <Zap className="w-8 h-8 text-white" />
               </div>
-              <h2 className="font-display text-2xl mb-2">Create your account</h2>
-              <p className="text-ink-500 text-sm">Start with free AI credits — no credit card needed</p>
+              <h1 className="text-2xl font-bold text-white mb-2">
+                {isLogin ? 'Welcome back' : 'Start your free trial'}
+              </h1>
+              <p className="text-slate-400">
+                {isLogin ? 'Sign in to access your dashboard' : '15 free AI credits. No credit card required.'}
+              </p>
             </div>
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-ink-600 mb-1">Email</label>
+                <label className="block text-sm text-slate-300 mb-1">Email</label>
                 <input 
                   type="email" 
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   placeholder="you@company.com"
-                  className="w-full px-4 py-3 border border-ink-200 rounded-soft focus:outline-none focus:border-forest-500"
+                  className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500"
                 />
               </div>
               
               <div>
-                <label className="block text-sm text-ink-600 mb-1">Password</label>
+                <label className="block text-sm text-slate-300 mb-1">Password</label>
                 <input 
                   type="password" 
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="Min 8 characters"
-                  className="w-full px-4 py-3 border border-ink-200 rounded-soft focus:outline-none focus:border-forest-500"
+                  className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500"
                 />
               </div>
               
-              <div>
-                <label className="block text-sm text-ink-600 mb-1">Your name</label>
-                <input 
-                  type="text" 
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  placeholder="John Doe"
-                  className="w-full px-4 py-3 border border-ink-200 rounded-soft focus:outline-none focus:border-forest-500"
-                />
-              </div>
+              {!isLogin && (
+                <div>
+                  <label className="block text-sm text-slate-300 mb-1">Your name</label>
+                  <input 
+                    type="text" 
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    placeholder="John Doe"
+                    className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500"
+                  />
+                </div>
+              )}
               
               {error && (
-                <p className="text-red-600 text-sm">{error}</p>
+                <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-lg p-3">{error}</p>
               )}
               
               <button 
-                onClick={handleCreateAccount}
-                disabled={!email || !password || loading}
-                className="btn-primary w-full flex items-center justify-center gap-2"
+                onClick={handleSubmit}
+                disabled={!email || !password || password.length < 8 || loading}
+                className="w-full bg-gradient-to-r from-forest-500 to-forest-600 text-white font-semibold py-3 px-6 rounded-xl hover:from-forest-400 hover:to-forest-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-forest-500/25"
               >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (isLogin ? 'Sign In' : 'Create Free Account')}
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (isLogin ? 'Sign In' : 'Create Free Account')}
                 {!loading && <ArrowRight className="w-4 h-4" />}
               </button>
               
-              <p className="text-center text-ink-500 text-sm">
+              <p className="text-center text-slate-400 text-sm">
                 {isLogin ? (
-                  <>Don't have an account? <button onClick={() => setIsLogin(false)} className="text-forest-600">Sign up free</button></>
+                  <>Don't have an account? <button onClick={() => setIsLogin(false)} className="text-forest-400 hover:text-forest-300">Sign up free</button></>
                 ) : (
-                  <>Already have an account? <button onClick={() => setIsLogin(true)} className="text-forest-600">Sign in</button></>
+                  <>Already have an account? <button onClick={() => setIsLogin(true)} className="text-forest-400 hover:text-forest-300">Sign in</button></>
                 )}
               </p>
             </div>
           </div>
         )}
 
-        {/* Step 1: Credits activated */}
-        {step === 1 && (
-          <div className="card text-center">
-            <div className="w-20 h-20 bg-gradient-to-br from-forest-400 to-forest-600 rounded-full flex items-center justify-center mx-auto mb-6">
+        {/* Step: Connecting */}
+        {step === 'connecting' && (
+          <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-8 text-center">
+            <Loader2 className="w-12 h-12 text-forest-400 animate-spin mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-white mb-2">Setting up your workspace...</h2>
+            <p className="text-slate-400">This will only take a moment.</p>
+          </div>
+        )}
+
+        {/* Step: Credits */}
+        {step === 'credits' && (
+          <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-8 text-center">
+            <div className="w-20 h-20 bg-gradient-to-br from-forest-400 to-forest-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-forest-500/30">
               <Sparkles className="w-10 h-10 text-white" />
             </div>
-            <h2 className="font-display text-3xl mb-2">{credits} Free Credits!</h2>
-            <p className="text-ink-600 mb-6">
-              Your account is ready. Use these credits to run AI agents and build your store.
+            <h2 className="text-3xl font-bold text-white mb-2">15 Free Credits!</h2>
+            <p className="text-slate-400 mb-6">
+              Your account is ready. Use these credits to research products, build stores, and launch ads.
             </p>
             
-            <div className="bg-forest-50 border border-forest-200 rounded-soft p-4 mb-6 text-left">
-              <p className="text-sm text-ink-700 font-medium mb-2">What you can do:</p>
-              <ul className="text-sm text-ink-600 space-y-1">
-                <li>✓ Research trending products</li>
-                <li>✓ Build a Shopify store with AI</li>
-                <li>✓ Generate ad copy and campaigns</li>
-                <li>✓ Find suppliers for your products</li>
+            <div className="bg-slate-900/50 border border-slate-600 rounded-xl p-4 mb-6 text-left">
+              <p className="text-sm text-slate-300 font-medium mb-3">What you can do:</p>
+              <ul className="text-sm text-slate-400 space-y-2">
+                <li className="flex items-center gap-2"><Check className="w-4 h-4 text-forest-400" /> Find trending products with AI</li>
+                <li className="flex items-center gap-2"><Check className="w-4 h-4 text-forest-400" /> Build a complete Shopify store</li>
+                <li className="flex items-center gap-2"><Check className="w-4 h-4 text-forest-400" /> Generate ad copy and campaigns</li>
+                <li className="flex items-center gap-2"><Check className="w-4 h-4 text-forest-400" /> Find vetted suppliers</li>
               </ul>
             </div>
             
             {error && (
-              <p className="text-red-600 text-sm mb-4">{error}</p>
+              <p className="text-red-400 text-sm mb-4">{error}</p>
             )}
             
             <button 
               onClick={handleActivateCredits}
               disabled={loading}
-              className="btn-primary w-full flex items-center justify-center gap-2"
+              className="w-full bg-gradient-to-r from-forest-500 to-forest-600 text-white font-semibold py-3 px-6 rounded-xl hover:from-forest-400 hover:to-forest-500 flex items-center justify-center gap-2 shadow-lg shadow-forest-500/25"
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Start Building'}
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Start Building'}
               {!loading && <ArrowRight className="w-4 h-4" />}
             </button>
           </div>
         )}
 
-        {/* Step 2: Connect Shopify (optional) */}
-        {step === 2 && (
-          <div className="card">
-            <h2 className="font-display text-2xl mb-2 text-center">Connect your store</h2>
-            <p className="text-ink-500 text-sm text-center mb-6">Skip for now — you can connect later from your dashboard</p>
-            
-            <div className="space-y-4">
-              <button className="btn-primary w-full flex items-center justify-center gap-2">
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M14.66 11.2c.87-.5 1.94-.83 3.08-.83 2.76 0 4.37 1.62 4.37 4.27 0 2.58-1.8 3.73-3.61 3.73H6.22v-1.67h8.34c.95 0 1.66-.47 1.66-1.57 0-.91-.5-1.57-1.66-1.57-1.1 0-2.09.42-2.85 1.02L8.55 8.5c1.05-.96 2.65-1.5 4.4-1.5 2.86 0 5.16 1.24 5.16 4.2 0 1.94-1.12 3.04-3 3.04-1.38 0-2.43-.58-3.08-1.3l-1.58 1.52c.91 1.17 2.3 1.8 4.19 1.8 3.15 0 5.88-1.74 5.88-5.26C15.42 12.52 12.56 11.2 14.66 11.2z"/>
-                </svg>
-                Connect Shopify Store
-              </button>
-              
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-ink-200" />
-                </div>
-                <div className="relative flex justify-center">
-                  <span className="bg-cream-100 px-4 text-sm text-ink-400">or</span>
-                </div>
-              </div>
-              
-              <button className="btn-secondary w-full">
-                Create new Shopify store
-              </button>
-              
-              <button 
-                onClick={handleSkipShopify}
-                className="w-full text-ink-500 text-sm text-center py-2"
-              >
-                Skip for now →
-              </button>
+        {/* Step: Done */}
+        {step === 'done' && (
+          <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-8 text-center">
+            <div className="w-16 h-16 bg-gradient-to-br from-forest-400 to-forest-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <Check className="w-8 h-8 text-white" />
             </div>
-          </div>
-        )}
-
-        {/* Step 3: Done */}
-        {step === 3 && (
-          <div className="card text-center">
-            <div className="w-16 h-16 bg-forest-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Check className="w-8 h-8 text-forest-600" />
-            </div>
-            <h2 className="font-display text-2xl mb-4">You're all set!</h2>
-            <p className="text-ink-600 mb-6">
-              {credits} free AI credits ready. Start by researching products or let StoreBuilder create your first store.
+            <h2 className="text-2xl font-bold text-white mb-4">You're all set!</h2>
+            <p className="text-slate-400 mb-6">
+              15 free AI credits ready. Start by researching products or let StoreBuilder create your first store.
             </p>
             <button 
-              onClick={() => navigate('/dashboard')}
-              className="btn-primary"
+              onClick={handleGoToDashboard}
+              className="w-full bg-gradient-to-r from-forest-500 to-forest-600 text-white font-semibold py-3 px-6 rounded-xl hover:from-forest-400 hover:to-forest-500 flex items-center justify-center gap-2 shadow-lg shadow-forest-500/25"
             >
               Go to Dashboard
+              <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         )}
