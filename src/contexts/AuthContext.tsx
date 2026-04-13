@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { User, Session } from '@supabase/supabase-js'
-import { supabase, signIn, signUp, signOut, getCurrentUser, getSession, onAuthStateChange } from '../lib/supabase'
+import { supabase, signIn, signUp, signOut, getSession, onAuthStateChange } from '../lib/supabase'
 
 interface AuthContextType {
   user: User | null
@@ -21,48 +21,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [organizationId, setOrganizationId] = useState<string | null>(null)
 
-  // Fetch user's organization
-  const fetchOrganization = async (userId: string) => {
+  const fetchOrganization = async (sessionToken: string) => {
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('organization_id')
-        .eq('id', userId)
-        .single()
-      
-      if (data?.organization_id) {
-        setOrganizationId(data.organization_id)
-        localStorage.setItem('storewright_org_id', data.organization_id)
+      const res = await fetch('https://shopifywithai.onrender.com/v1/organizations/me', {
+        headers: {
+          Authorization: `Bearer ${sessionToken}`,
+          Accept: 'application/json',
+        },
+      })
+      if (!res.ok) return
+      const data = await res.json()
+      const orgId = data?.organization?.id
+      if (orgId) {
+        setOrganizationId(orgId)
+        localStorage.setItem('storewright_org_id', orgId)
       }
-    } catch (err) {
-      // User might not exist in users table yet
-      console.log('No organization found for user')
+    } catch {
+      // ignore
     }
   }
 
   const refreshOrganization = async () => {
-    if (user) {
-      await fetchOrganization(user.id)
+    const { data } = await supabase.auth.getSession()
+    const session = data.session
+    if (session?.access_token) {
+      await fetchOrganization(session.access_token)
     }
   }
 
   useEffect(() => {
-    // Check active session
-    getSession().then((session) => {
+    getSession().then(async (session) => {
       setSession(session)
       setUser(session?.user ?? null)
-      if (session?.user) {
-        fetchOrganization(session.user.id)
+      if (session?.access_token) {
+        await fetchOrganization(session.access_token)
       }
       setLoading(false)
     })
 
-    // Listen for auth changes
-    const { data: { subscription } } = onAuthStateChange((event, session) => {
+    const { data: { subscription } } = onAuthStateChange(async (_event, session) => {
       setSession(session)
       setUser(session?.user ?? null)
-      if (session?.user) {
-        fetchOrganization(session.user.id)
+      if (session?.access_token) {
+        await fetchOrganization(session.access_token)
       } else {
         setOrganizationId(null)
         localStorage.removeItem('storewright_org_id')
@@ -91,24 +92,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('storewright_org_id')
   }
 
-  const value = {
-    user,
-    session,
-    loading,
-    organizationId,
-    signIn: handleSignIn,
-    signUp: handleSignUp,
-    signOut: handleSignOut,
-    refreshOrganization,
-  }
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        session,
+        loading,
+        organizationId,
+        signIn: handleSignIn,
+        signUp: handleSignUp,
+        signOut: handleSignOut,
+        refreshOrganization,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
 export function useAuth() {
   const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider')
-  }
+  if (!context) throw new Error('useAuth must be used within AuthProvider')
   return context
 }
