@@ -18,6 +18,7 @@ export default function Onboarding() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [credits, setCredits] = useState(5)
+  const [isLogin, setIsLogin] = useState(searchParams.get('login') === 'true')
   
   // Form state
   const [email, setEmail] = useState('')
@@ -32,12 +33,26 @@ export default function Onboarding() {
     
     try {
       const result = await apiClient.createOrg(name || email.split('@')[0], email)
+      
       if (result.error) {
-        setError(result.error)
+        // Show specific error messages
+        const err = result.error.toLowerCase()
+        if (err.includes('already exists') || err.includes('duplicate')) {
+          setError('An account with this email already exists. Try signing in instead.')
+        } else if (err.includes('email')) {
+          setError('Please enter a valid email address.')
+        } else {
+          setError(result.error)
+        }
       } else if (result.data?.organization?.id) {
         setOrgId(result.data.organization.id)
-        setCredits(FREE_CREDITS[plan as keyof typeof FREE_CREDITS] || 5)
-        setStep(1)
+        // If returning user, show them their dashboard directly
+        if (result.data.existing) {
+          navigate('/dashboard')
+        } else {
+          setCredits(FREE_CREDITS[plan as keyof typeof FREE_CREDITS] || 5)
+          setStep(1)
+        }
       }
     } catch (e) {
       setError('Something went wrong. Please try again.')
@@ -147,12 +162,16 @@ export default function Onboarding() {
                 disabled={!email || !password || loading}
                 className="btn-primary w-full flex items-center justify-center gap-2"
               >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create Free Account'}
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (isLogin ? 'Sign In' : 'Create Free Account')}
                 {!loading && <ArrowRight className="w-4 h-4" />}
               </button>
               
               <p className="text-center text-ink-500 text-sm">
-                Already have an account? <Link to="/onboarding?login" className="text-forest-600">Sign in</Link>
+                {isLogin ? (
+                  <>Don't have an account? <button onClick={() => setIsLogin(false)} className="text-forest-600">Sign up free</button></>
+                ) : (
+                  <>Already have an account? <button onClick={() => setIsLogin(true)} className="text-forest-600">Sign in</button></>
+                )}
               </p>
             </div>
           </div>
