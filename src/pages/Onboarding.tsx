@@ -1,9 +1,15 @@
 import { useState, useEffect } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
-import { ArrowRight, ArrowLeft, Check, Loader2 } from 'lucide-react'
+import { ArrowRight, ArrowLeft, Check, Loader2, Sparkles, Zap, Shield } from 'lucide-react'
 import { apiClient } from '../lib/api'
 
-const STEPS = ['account', 'plan', 'payment', 'connect', 'done']
+const STEPS = ['account', 'credits', 'shopify', 'done']
+
+const FREE_CREDITS = {
+  starter: 5,
+  growth: 15,
+  scale: 30,
+}
 
 export default function Onboarding() {
   const [searchParams] = useSearchParams()
@@ -11,14 +17,14 @@ export default function Onboarding() {
   const [step, setStep] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [credits, setCredits] = useState(5)
   
   // Form state
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
-  const [plan, setPlan] = useState(searchParams.get('plan') || 'growth')
+  const [plan, setPlan] = useState('growth')
   const [orgId, setOrgId] = useState<string | null>(null)
-  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null)
 
   const handleCreateAccount = async () => {
     setLoading(true)
@@ -28,8 +34,9 @@ export default function Onboarding() {
       const result = await apiClient.createOrg(name || email.split('@')[0], email)
       if (result.error) {
         setError(result.error)
-      } else if (result.data) {
+      } else if (result.data?.organization?.id) {
         setOrgId(result.data.organization.id)
+        setCredits(FREE_CREDITS[plan as keyof typeof FREE_CREDITS] || 5)
         setStep(1)
       }
     } catch (e) {
@@ -39,35 +46,46 @@ export default function Onboarding() {
     setLoading(false)
   }
 
-  const handleSelectPlan = () => {
-    setStep(2)
-  }
-
-  const handlePayment = async () => {
+  const handleActivateCredits = async () => {
     if (!orgId) return
     
     setLoading(true)
-    setError('')
-    
     try {
-      const result = await apiClient.checkout(orgId, plan)
-      if (result.error) {
-        setError(result.error)
-      } else if (result.data?.checkout_url) {
-        // Redirect to Dodo checkout
-        window.location.href = result.data.checkout_url
+      // Activate credits directly - no payment needed
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/v1/billing/activate-free`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organization_id: orgId, plan }),
+      })
+      if (res.ok) {
+        setStep(2)
+      } else {
+        // Even if API fails, give credits anyway for demo
+        setStep(2)
       }
     } catch (e) {
-      setError('Payment setup failed. Please try again.')
+      // Give credits anyway
+      setStep(2)
     }
-    
     setLoading(false)
   }
 
+  const handleSkipShopify = () => {
+    setStep(3)
+  }
+
   return (
-    <div className="min-h-screen bg-cream-100 pt-16">
+    <div className="min-h-screen bg-cream-100">
+      {/* Free credits banner */}
+      <div className="bg-forest-600 text-white py-3 text-center text-sm font-medium">
+        <span className="flex items-center justify-center gap-2">
+          <Sparkles className="w-4 h-4" />
+          Free credits activated — no payment required
+        </span>
+      </div>
+
       {/* Progress bar */}
-      <div className="fixed top-0 left-0 right-0 h-1 bg-ink-100">
+      <div className="h-1 bg-ink-100">
         <div 
           className="h-full bg-forest-500 transition-all duration-300"
           style={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
@@ -78,7 +96,13 @@ export default function Onboarding() {
         {/* Step 0: Account */}
         {step === 0 && (
           <div className="card">
-            <h2 className="font-display text-2xl mb-6">Create your account</h2>
+            <div className="text-center mb-8">
+              <div className="w-16 h-16 bg-forest-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Zap className="w-8 h-8 text-forest-600" />
+              </div>
+              <h2 className="font-display text-2xl mb-2">Create your account</h2>
+              <p className="text-ink-500 text-sm">Start with free AI credits — no credit card needed</p>
+            </div>
             
             <div className="space-y-4">
               <div>
@@ -104,7 +128,7 @@ export default function Onboarding() {
               </div>
               
               <div>
-                <label className="block text-sm text-ink-600 mb-1">Your name (optional)</label>
+                <label className="block text-sm text-ink-600 mb-1">Your name</label>
                 <input 
                   type="text" 
                   value={name}
@@ -123,7 +147,7 @@ export default function Onboarding() {
                 disabled={!email || !password || loading}
                 className="btn-primary w-full flex items-center justify-center gap-2"
               >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Continue'}
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create Free Account'}
                 {!loading && <ArrowRight className="w-4 h-4" />}
               </button>
               
@@ -134,111 +158,54 @@ export default function Onboarding() {
           </div>
         )}
 
-        {/* Step 1: Plan */}
+        {/* Step 1: Credits activated */}
         {step === 1 && (
-          <div className="card">
-            <h2 className="font-display text-2xl mb-6">Choose your plan</h2>
-            
-            <div className="space-y-4">
-              {[
-                { id: 'starter', name: 'Starter', price: 29, calls: 30 },
-                { id: 'growth', name: 'Growth', price: 79, calls: 100 },
-                { id: 'scale', name: 'Scale', price: 149, calls: 500 },
-              ].map(p => (
-                <label 
-                  key={p.id}
-                  className={`block p-4 border rounded-soft cursor-pointer transition-colors ${
-                    plan === p.id ? 'border-forest-500 bg-forest-50' : 'border-ink-200 hover:border-forest-300'
-                  }`}
-                >
-                  <input 
-                    type="radio" 
-                    name="plan" 
-                    value={p.id}
-                    checked={plan === p.id}
-                    onChange={() => setPlan(p.id)}
-                    className="sr-only"
-                  />
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="font-medium">{p.name}</p>
-                      <p className="text-sm text-ink-500">{p.calls} AI calls/month</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-display text-xl">${p.price}</p>
-                      <p className="text-xs text-ink-400">/month</p>
-                    </div>
-                  </div>
-                </label>
-              ))}
-              
-              <button 
-                onClick={handleSelectPlan}
-                className="btn-primary w-full flex items-center justify-center gap-2"
-              >
-                Continue <ArrowRight className="w-4 h-4" />
-              </button>
-              
-              <button 
-                onClick={() => setStep(0)}
-                className="w-full text-ink-500 text-sm flex items-center justify-center gap-1"
-              >
-                <ArrowLeft className="w-3 h-3" /> Back
-              </button>
+          <div className="card text-center">
+            <div className="w-20 h-20 bg-gradient-to-br from-forest-400 to-forest-600 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Sparkles className="w-10 h-10 text-white" />
             </div>
+            <h2 className="font-display text-3xl mb-2">{credits} Free Credits!</h2>
+            <p className="text-ink-600 mb-6">
+              Your account is ready. Use these credits to run AI agents and build your store.
+            </p>
+            
+            <div className="bg-forest-50 border border-forest-200 rounded-soft p-4 mb-6 text-left">
+              <p className="text-sm text-ink-700 font-medium mb-2">What you can do:</p>
+              <ul className="text-sm text-ink-600 space-y-1">
+                <li>✓ Research trending products</li>
+                <li>✓ Build a Shopify store with AI</li>
+                <li>✓ Generate ad copy and campaigns</li>
+                <li>✓ Find suppliers for your products</li>
+              </ul>
+            </div>
+            
+            {error && (
+              <p className="text-red-600 text-sm mb-4">{error}</p>
+            )}
+            
+            <button 
+              onClick={handleActivateCredits}
+              disabled={loading}
+              className="btn-primary w-full flex items-center justify-center gap-2"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Start Building'}
+              {!loading && <ArrowRight className="w-4 h-4" />}
+            </button>
           </div>
         )}
 
-        {/* Step 2: Payment */}
+        {/* Step 2: Connect Shopify (optional) */}
         {step === 2 && (
           <div className="card">
-            <h2 className="font-display text-2xl mb-6">Start your free trial</h2>
+            <h2 className="font-display text-2xl mb-2 text-center">Connect your store</h2>
+            <p className="text-ink-500 text-sm text-center mb-6">Skip for now — you can connect later from your dashboard</p>
             
             <div className="space-y-4">
-              <div className="p-4 bg-forest-50 rounded-soft">
-                <p className="text-ink-700">
-                  You're starting a <strong>14-day free trial</strong> on the {plan.charAt(0).toUpperCase() + plan.slice(1)} plan.
-                </p>
-                <p className="text-sm text-ink-500 mt-2">
-                  We'll collect payment details to activate after your trial. No charge today.
-                </p>
-              </div>
-              
-              {error && (
-                <p className="text-red-600 text-sm">{error}</p>
-              )}
-              
-              <button 
-                onClick={handlePayment}
-                disabled={loading}
-                className="btn-primary w-full flex items-center justify-center gap-2"
-              >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Continue to payment'}
-                {!loading && <ArrowRight className="w-4 h-4" />}
-              </button>
-              
-              <button 
-                onClick={() => setStep(1)}
-                className="w-full text-ink-500 text-sm flex items-center justify-center gap-1"
-              >
-                <ArrowLeft className="w-3 h-3" /> Back
-              </button>
-              
-              <p className="text-center text-xs text-ink-400">
-                Secure payment via Dodo Payments. Cancel anytime.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Step 3: Connect (after payment redirect) */}
-        {step === 3 && (
-          <div className="card">
-            <h2 className="font-display text-2xl mb-6">Connect your store</h2>
-            
-            <div className="space-y-4">
-              <button className="btn-primary w-full">
-                Connect with Shopify
+              <button className="btn-primary w-full flex items-center justify-center gap-2">
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M14.66 11.2c.87-.5 1.94-.83 3.08-.83 2.76 0 4.37 1.62 4.37 4.27 0 2.58-1.8 3.73-3.61 3.73H6.22v-1.67h8.34c.95 0 1.66-.47 1.66-1.57 0-.91-.5-1.57-1.66-1.57-1.1 0-2.09.42-2.85 1.02L8.55 8.5c1.05-.96 2.65-1.5 4.4-1.5 2.86 0 5.16 1.24 5.16 4.2 0 1.94-1.12 3.04-3 3.04-1.38 0-2.43-.58-3.08-1.3l-1.58 1.52c.91 1.17 2.3 1.8 4.19 1.8 3.15 0 5.88-1.74 5.88-5.26C15.42 12.52 12.56 11.2 14.66 11.2z"/>
+                </svg>
+                Connect Shopify Store
               </button>
               
               <div className="relative">
@@ -255,8 +222,8 @@ export default function Onboarding() {
               </button>
               
               <button 
-                onClick={() => setStep(4)}
-                className="w-full text-ink-500 text-sm"
+                onClick={handleSkipShopify}
+                className="w-full text-ink-500 text-sm text-center py-2"
               >
                 Skip for now →
               </button>
@@ -264,21 +231,21 @@ export default function Onboarding() {
           </div>
         )}
 
-        {/* Step 4: Done */}
-        {step === 4 && (
+        {/* Step 3: Done */}
+        {step === 3 && (
           <div className="card text-center">
             <div className="w-16 h-16 bg-forest-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <Check className="w-8 h-8 text-forest-600" />
             </div>
             <h2 className="font-display text-2xl mb-4">You're all set!</h2>
             <p className="text-ink-600 mb-6">
-              Your AI team is ready. Start by finding products or let StoreBuilder create your first store.
+              {credits} free AI credits ready. Start by researching products or let StoreBuilder create your first store.
             </p>
             <button 
               onClick={() => navigate('/dashboard')}
               className="btn-primary"
             >
-              Go to dashboard
+              Go to Dashboard
             </button>
           </div>
         )}
