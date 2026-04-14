@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { ArrowRight, Sparkles, Store, Megaphone, Package, BarChart3, Loader2, Check, AlertCircle, LogOut } from 'lucide-react'
 import ConnectModal from '../components/ConnectModal'
 
-const API_BASE = 'https://shopifywithai.onrender.com'
+const API_BASE = import.meta.env.VITE_API_URL || 'https://shopifywithai.onrender.com'
 
 export default function Dashboard() {
   const { user, organizationId, signOut, refreshOrganization } = useAuth()

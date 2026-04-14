@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'https://shopifywithai.onrender.com'
+const API_BASE = import.meta.env.VITE_API_URL \|\| 'https://shopifywithai.onrender.com'
 
 interface ApiResponse<T> {
   data?: T
