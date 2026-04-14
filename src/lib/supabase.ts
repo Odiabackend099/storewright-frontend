@@ -5,25 +5,20 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJ
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
-// Auth helpers
 export const signUp = async (email: string, password: string, fullName: string) => {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      data: {
-        full_name: fullName,
-      },
+      emailRedirectTo: `${window.location.origin}/dashboard`,
+      data: { full_name: fullName },
     },
   })
   return { data, error }
 }
 
 export const signIn = async (email: string, password: string) => {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  })
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
   return { data, error }
 }
 
@@ -42,7 +37,6 @@ export const getSession = async () => {
   return session
 }
 
-// Listen for auth changes
 export const onAuthStateChange = (callback: (event: string, session: any) => void) => {
   return supabase.auth.onAuthStateChange(callback)
 }
